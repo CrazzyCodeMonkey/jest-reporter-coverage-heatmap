@@ -1,0 +1,50 @@
+# Any time we push/merge to Master, we need to up
+name: Node Package CD
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Step 1 - Source Checkout
+        uses: actions/checkout@v2
+      - name: Step 2 - Setup Node.j Env
+        uses: actions/setup-node@v2
+        with:
+          node-version: 12.x
+          registry-url: "https://npm.pkg.github.com"
+      - name: Step 3 - Install Production Dependancies
+        run: npm ci --production
+      - name: Step 4 - Build Project
+        run: npm run build
+      - name: Step 5 - Publish to npmjs.com
+        run: |
+          npx can-npm-publish --verbose && npm publish || echo "Did not publish new version"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - nane: Step 6 - Get Package Version
+        run: node -p -e '`PACKAGE_VERSION=${require('./package.json').version}`' >> $GITHUB_ENV
+      - name: Step 7 - Publish Git Version Tag
+        run: pkgdeps/git-tag-action@v2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_repo: ${{ github.repository }}
+          version: ${{ env.PACKAGE_VERSION }}
+          git_commit_sha: ${{ github.sha }}
+          git_tag_prefix: "v"
